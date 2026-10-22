@@ -1,7 +1,7 @@
 {
   "name": "Wordmark",
   "short_name": "Wordmark",
-  "description": "모르는 단어를, 소설 속 문장으로",
+  "description": "어려운 영어 원서 읽기, Wordmark로 쉽게",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

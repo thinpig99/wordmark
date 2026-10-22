@@ -58,7 +58,7 @@ export default function Login() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 40, padding: '48px 0 24px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           <div className="serif" style={{ fontSize: 44, fontWeight: 600, letterSpacing: -0.6 }}>Wordmark</div>
-          <p className="lede" style={{ fontSize: 15 }}>모르는 단어를, 소설 속 문장으로</p>
+          <p className="lede" style={{ fontSize: 15 }}>어려운 영어 원서 읽기, Wordmark로 쉽게</p>
         </div>
 
         <form onSubmit={submit} className="stack" style={{ gap: 14 }}>
