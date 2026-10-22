@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { BookmarkIcon, CheckIcon, ChevronLeft, SpeakerIcon } from '../components/Icons'
-import { lookupDetail, lookupWord, type LookupResult } from '../lib/api'
+import { ArrowUpIcon, BookmarkIcon, CheckIcon, ChevronLeft, SpeakerIcon } from '../components/Icons'
+import { isValidWord, lookupDetail, lookupWord, normalizeWord, type LookupResult } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import type { UserWord, Word } from '../lib/types'
 
@@ -48,6 +48,9 @@ export default function WordPage() {
   const [userWord, setUserWord] = useState<UserWord | null>(null)
   const [saving, setSaving] = useState(false)
   const [slow, setSlow] = useState(false)
+  const [q, setQ] = useState('')
+  const [qError, setQError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailFailed, setDetailFailed] = useState(false)
 
@@ -86,6 +89,21 @@ export default function WordPage() {
     }
   }, [lemma, params])
 
+  function searchNext(e: FormEvent) {
+    e.preventDefault()
+    const w = normalizeWord(q)
+    if (!w) return
+    if (!isValidWord(w)) {
+      setQError('영어 단어나 짧은 표현을 입력해 주세요.')
+      return
+    }
+    setQ('')
+    setQError(null)
+    inputRef.current?.blur()
+    window.scrollTo({ top: 0 })
+    if (w !== lemma) navigate(`/word/${encodeURIComponent(w)}`)
+  }
+
   function back() {
     if (window.history.length > 1) navigate(-1)
     else navigate('/')
@@ -111,16 +129,21 @@ export default function WordPage() {
 
   return (
     <div className="screen">
-      <header className="topbar compact">
-        <button type="button" className="icon-btn plain" onClick={back} aria-label="뒤로"><ChevronLeft /></button>
-        {word && (
-          <button type="button" className="btn btn-outline btn-sm" style={{ height: 36, fontSize: 13 }}
-            onClick={() => toggleSave(word)} disabled={saving}
-            aria-label={userWord ? '단어장에서 빼기' : '단어장에 저장'}>
-            <BookmarkIcon filled={!!userWord} />
-            {userWord ? '저장됨' : '저장'}
-          </button>
-        )}
+      <header style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--bg)', padding: 'calc(8px + env(safe-area-inset-top)) 16px 10px 4px', marginTop: 'calc(-1 * env(safe-area-inset-top))', borderBottom: '1px solid var(--divider)' }}>
+        <div className="row" style={{ gap: 4 }}>
+          <button type="button" className="icon-btn plain" onClick={back} aria-label="뒤로"><ChevronLeft /></button>
+          <form onSubmit={searchNext} className="search" style={{ flex: 1, padding: '3px 3px 3px 16px', boxShadow: 'none' }}>
+            <label htmlFor="q2" className="visually-hidden">다른 단어 검색</label>
+            <input ref={inputRef} id="q2" type="text" placeholder="다른 단어 검색" value={q}
+              autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} enterKeyHint="search"
+              style={{ height: 38, fontSize: 17 }}
+              onChange={(e) => { setQ(e.target.value); setQError(null) }} />
+            <button type="submit" className="send" aria-label="검색" disabled={!q.trim()} style={{ width: 38, height: 38 }}>
+              <ArrowUpIcon size={18} />
+            </button>
+          </form>
+        </div>
+        {qError && <p className="error small" style={{ margin: '6px 0 0 52px' }}>{qError}</p>}
       </header>
 
       <main className="content" style={{ gap: 36, padding: '18px 24px 48px' }}>
@@ -161,12 +184,18 @@ export default function WordPage() {
             <section className="stack" style={{ gap: 10 }}>
               <h1 className="serif" style={{ margin: 0, fontSize: 44, fontWeight: 600, letterSpacing: -0.8, lineHeight: 1.1, wordBreak: 'break-word' }}>{word.lemma}</h1>
               <div className="row muted" style={{ gap: 10, flexWrap: 'wrap', fontSize: 14 }}>
-                {word.ipa && <span className="serif" style={{ fontSize: 17 }}>{word.ipa}</span>}
+                {word.ipa && <span style={{ fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif' }}>{word.ipa}</span>}
                 <button type="button" onClick={() => speak(word.lemma)} aria-label="발음 듣기"
                   style={{ width: 36, height: 36, borderRadius: 18, border: 0, background: 'var(--surface)', color: 'var(--text)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                   <SpeakerIcon />
                 </button>
                 {word.pos && <span className="pill" style={{ color: 'var(--text)' }}>{word.pos}</span>}
+                <button type="button" className="btn btn-outline btn-sm" style={{ height: 36, fontSize: 13, marginLeft: 'auto' }}
+                  onClick={() => toggleSave(word)} disabled={saving}
+                  aria-label={userWord ? '단어장에서 빼기' : '단어장에 저장'}>
+                  <BookmarkIcon filled={!!userWord} />
+                  {userWord ? '저장됨' : '저장'}
+                </button>
                 {word.etymology?.base_form && (
                   <Link to={`/word/${encodeURIComponent(word.etymology.base_form)}`} className="pill" style={{ textDecoration: 'none', color: 'var(--text)' }}>
                     기본형 <span className="serif">{word.etymology.base_form}</span>
@@ -224,21 +253,6 @@ export default function WordPage() {
                     {word.quote.source ?? 'AI가 만든 예문이에요'}
                   </figcaption>
                 </figure>
-                {word.quote.note && <p className="prose">{word.quote.note}</p>}
-              </section>
-            )}
-
-            {word.examples.length > 0 && (
-              <section className="stack" style={{ gap: 12 }}>
-                <h2 className="section-label">이렇게도 써요</h2>
-                {word.examples.map((ex, i) => (
-                  <div key={i} className="stack" style={{ gap: 4, paddingBottom: 14, borderBottom: i < word.examples.length - 1 ? '1px solid var(--divider)' : 'none' }}>
-                    <span className="serif" style={{ fontSize: 18, lineHeight: 1.5 }}>
-                      {highlight(ex.en, terms, (s, j) => <b key={j} style={{ fontWeight: 600 }}>{s}</b>)}
-                    </span>
-                    {ex.ko && <span className="muted" style={{ fontSize: 14 }}>{ex.ko}</span>}
-                  </div>
-                ))}
               </section>
             )}
 

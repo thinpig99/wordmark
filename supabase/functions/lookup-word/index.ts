@@ -44,15 +44,13 @@ Word: "${word}" (${pos ?? ""}: ${meaning})
 
 Return ONLY a JSON object:
 {
-  "nuance": 2-3 Korean sentences beyond the dictionary: the feeling the word carries, when writers use it, how it differs from a similar word,
-  "etymology": {"parts": [{"part": "morpheme as written, e.g. cease or -less", "meaning": "short Korean"}], "note": 1-2 Korean sentences on its origin and how the parts build the meaning},
-  "quote": {"text": one English sentence (max 30 words) using the word, "translation": natural Korean, "source": "Author, Title (year)" or null, "note": 1-2 Korean sentences on what the word adds there},
-  "examples": [{"en": "...", "ko": "..."}, {"en": "...", "ko": "..."}]
+  "nuance": ONE short Korean sentence (max 50 Korean characters) on the feeling the word carries beyond the dictionary,
+  "etymology": {"parts": [{"part": "morpheme as written, e.g. cease or -less", "meaning": "short Korean"}], "note": ONE short Korean sentence (max 50 Korean characters) on its origin},
+  "quote": {"text": one English sentence (max 25 words) using the word, "translation": natural Korean, "source": "Author, Title (year)" or null}
 }
 Rules:
-- Korean sentences in polite, friendly 해요체.
-- quote: prefer a real sentence from a classic novel published before 1929 that you know word-for-word. If not completely sure of the exact wording, write an original literary sentence and set "source" to null. Never invent an author or title.
-- examples: two natural, modern sentences.`;
+- Be brief. Korean sentences in polite, friendly 해요체.
+- quote: prefer a real sentence from a classic novel published before 1929 that you know word-for-word. If not completely sure of the exact wording, write an original literary sentence and set "source" to null. Never invent an author or title.`;
 }
 
 function cleanDetail(ai: AiDetail) {
@@ -60,24 +58,20 @@ function cleanDetail(ai: AiDetail) {
     .map((p) => ({ part: str(p.part, 40), meaning: str(p.meaning, 60) }))
     .filter((p) => p.part)
     .slice(0, 5);
-  const examples = (ai.examples ?? [])
-    .map((e) => ({ en: str(e.en, 300), ko: str(e.ko, 300) }))
-    .filter((e) => e.en)
-    .slice(0, 3);
   const quoteText = str(ai.quote?.text, 400);
   return {
-    nuance: str(ai.nuance, 800),
+    nuance: str(ai.nuance, 300),
     etymology_parts: parts,
-    etymology_note: str(ai.etymology?.note, 600),
+    etymology_note: str(ai.etymology?.note, 300),
     quote: quoteText
       ? {
         text: quoteText,
         translation: str(ai.quote?.translation, 400),
         source: str(ai.quote?.source, 120),
-        note: str(ai.quote?.note, 500),
+        note: null,
       }
       : null,
-    examples,
+    examples: [],
   };
 }
 
