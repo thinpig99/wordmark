@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { BookmarkIcon, CheckIcon, ChevronLeft, SpeakerIcon } from '../components/Icons'
-import { lookupWord, type LookupResult } from '../lib/api'
+import { lookupDetail, lookupWord, type LookupResult } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import type { UserWord, Word } from '../lib/types'
 
@@ -48,12 +48,16 @@ export default function WordPage() {
   const [userWord, setUserWord] = useState<UserWord | null>(null)
   const [saving, setSaving] = useState(false)
   const [slow, setSlow] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailFailed, setDetailFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
     setResult(null)
     setError(null)
     setSlow(false)
+    setDetailLoading(false)
+    setDetailFailed(false)
     const t = setTimeout(() => alive && setSlow(true), 2500)
     const page = Number(params.get('page'))
     lookupWord(lemma, {
@@ -63,7 +67,16 @@ export default function WordPage() {
       .then((r) => {
         if (!alive) return
         setResult(r)
-        if (!r.notFound) setUserWord(r.userWord)
+        if (r.notFound) return
+        setUserWord(r.userWord)
+        if (r.needsDetail) {
+          // 뜻을 먼저 보여주고, 어원·구절·예문은 이어서 채움
+          setDetailLoading(true)
+          lookupDetail(r.word.lemma)
+            .then((d) => alive && setResult({ ...r, word: d.word, needsDetail: false }))
+            .catch(() => alive && setDetailFailed(true))
+            .finally(() => alive && setDetailLoading(false))
+        }
       })
       .catch((e) => alive && setError(e.message))
       .finally(() => clearTimeout(t))
@@ -118,7 +131,7 @@ export default function WordPage() {
             <div className="skeleton" style={{ height: 80 }} />
             <div className="skeleton" style={{ height: 140 }} />
             <p className="muted small" style={{ margin: 0 }}>
-              {slow ? '처음 찾는 단어라 AI가 설명을 만들고 있어요. 10초 정도 걸려요.' : '찾고 있어요'}
+              {slow ? '처음 찾는 단어라 AI가 뜻을 찾고 있어요.' : '찾고 있어요'}
             </p>
           </div>
         )}
@@ -167,6 +180,17 @@ export default function WordPage() {
               <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.3 }}>{word.meaning_ko}</div>
               {word.nuance && <p className="prose">{word.nuance}</p>}
             </section>
+
+            {detailLoading && (
+              <div className="stack" style={{ gap: 14 }} role="status" aria-live="polite">
+                <div className="skeleton" style={{ height: 70 }} />
+                <div className="skeleton" style={{ height: 160 }} />
+                <p className="muted small" style={{ margin: 0 }}>어원과 소설 속 구절을 찾고 있어요</p>
+              </div>
+            )}
+            {detailFailed && (
+              <p className="muted small" style={{ margin: 0 }}>어원과 예문을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
+            )}
 
             {word.etymology && (word.etymology.parts.length > 0 || word.etymology.note) && (
               <section className="stack" style={{ gap: 14 }}>

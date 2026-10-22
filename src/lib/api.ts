@@ -15,11 +15,15 @@ async function invoke<T>(name: string, body: Record<string, unknown>): Promise<T
 }
 
 export type LookupResult =
-  | { word: Word; userWord: UserWord | null; cached: boolean; notFound?: undefined }
+  | { word: Word; userWord: UserWord | null; cached: boolean; needsDetail?: boolean; notFound?: undefined }
   | { notFound: true; suggestion: string | null }
 
 export function lookupWord(word: string, opts: { source?: 'search' | 'photo'; page_id?: number } = {}) {
   return invoke<LookupResult>('lookup-word', { word, ...opts })
+}
+
+export function lookupDetail(word: string) {
+  return invoke<{ word: Word }>('lookup-word', { word, stage: 'detail' })
 }
 
 export function translatePage(image: string, mime = 'image/jpeg') {

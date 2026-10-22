@@ -87,23 +87,40 @@ const MODELS = (Deno.env.get("GEMINI_MODELS") ??
 
 type Part = { text: string } | { inline_data: { mime_type: string; data: string } };
 
+// 깊게 생각하는 단계를 끄면 응답이 훨씬 빨라짐 (모델 세대마다 설정 이름이 다름)
+function thinkingFor(model: string) {
+  if (model.startsWith("gemini-2.5")) return { thinkingBudget: 0 };
+  return { thinkingLevel: "minimal" };
+}
+
 export async function gemini<T>(parts: Part[]): Promise<{ result: T; model: string }> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new HttpError(500, "AI 키가 아직 설정되지 않았어요.");
 
+  const call = (model: string, withThinking: boolean) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.4,
+          ...(withThinking ? { thinkingConfig: thinkingFor(model) } : {}),
+        },
+      }),
+    });
+
   let rateLimited = false;
   for (const model of MODELS) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
-        }),
-      },
-    );
+    const started = Date.now();
+    let res = await call(model, true);
+    if (res.status === 400) {
+      // 이 모델이 생각 설정을 지원하지 않으면 설정 없이 다시 시도
+      console.warn(`gemini ${model} rejected thinkingConfig: ${(await res.text()).slice(0, 200)}`);
+      res = await call(model, false);
+    }
+    console.log(`gemini ${model} ${res.status} ${Date.now() - started}ms`);
 
     if (res.status === 429) {
       rateLimited = true;
