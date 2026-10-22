@@ -10,6 +10,7 @@ import {
   gemini,
   HttpError,
   json,
+  logUsage,
   str,
 } from "./_shared.ts";
 
@@ -104,7 +105,8 @@ Deno.serve(async (req) => {
       if (!word) throw new HttpError(404, "단어를 찾지 못했어요.");
       if (word.detail_at) return json({ word });
 
-      const { result } = await gemini<AiDetail>([{ text: detailPrompt(lemma, word.meaning_ko, word.pos) }]);
+      const { result, usage } = await gemini<AiDetail>([{ text: detailPrompt(lemma, word.meaning_ko, word.pos) }]);
+      await logUsage(admin, user.id, "word_detail", usage);
       const d = cleanDetail(result);
       const { data: updated, error: upErr } = await admin
         .from("words")
@@ -136,7 +138,8 @@ Deno.serve(async (req) => {
 
     if (!word) {
       await consumeQuota(userClient, "lookup");
-      const { result, model } = await gemini<AiQuick>([{ text: quickPrompt(lemma) }]);
+      const { result, model, usage } = await gemini<AiQuick>([{ text: quickPrompt(lemma) }]);
+      await logUsage(admin, user.id, "word_quick", usage);
       if (result.valid === false || !str(result.meaning_ko)) {
         const suggestion = str(result.suggestion, 64)?.toLowerCase() ?? null;
         return json({ notFound: true, suggestion: suggestion && suggestion !== lemma ? suggestion : null });

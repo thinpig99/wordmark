@@ -7,6 +7,7 @@ import {
   gemini,
   HttpError,
   json,
+  logUsage,
   str,
 } from "./_shared.ts";
 
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     if (req.method !== "POST") throw new HttpError(405, "POST only");
-    const { user, userClient } = await authenticate(req);
+    const { user, userClient, admin } = await authenticate(req);
     const body = await req.json().catch(() => ({}));
 
     const image = typeof body.image === "string" ? body.image.replace(/^data:[^,]+,/, "") : "";
@@ -48,10 +49,11 @@ Deno.serve(async (req) => {
     if (image.length > 8_000_000) throw new HttpError(413, "사진이 너무 커요. 다시 찍어 주세요.");
 
     await consumeQuota(userClient, "photo");
-    const { result } = await gemini<AiPage>([
+    const { result, usage } = await gemini<AiPage>([
       { inline_data: { mime_type: mime, data: image } },
       { text: PROMPT },
     ]);
+    await logUsage(admin, user.id, "photo", usage);
 
     const sentences = (result.sentences ?? [])
       .map((s) => ({ orig: str(s.orig, 1200), trans: str(s.trans, 1200) }))

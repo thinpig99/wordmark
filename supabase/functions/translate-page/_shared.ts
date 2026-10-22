@@ -93,7 +93,28 @@ function thinkingFor(model: string) {
   return { thinkingLevel: "minimal" };
 }
 
-export async function gemini<T>(parts: Part[]): Promise<{ result: T; model: string }> {
+export type AiUsage = { model: string; input: number | null; output: number | null; thinking: number | null; ms: number };
+
+// 호출마다 토큰 수를 기록 (원가 분석용, 실패해도 서비스에는 영향 없음)
+export async function logUsage(
+  admin: SupabaseClient,
+  userId: string,
+  kind: "word_quick" | "word_detail" | "photo",
+  u: AiUsage,
+) {
+  const { error } = await admin.from("ai_calls").insert({
+    user_id: userId,
+    kind,
+    model: u.model,
+    input_tokens: u.input,
+    output_tokens: u.output,
+    thinking_tokens: u.thinking,
+    ms: u.ms,
+  });
+  if (error) console.warn("usage log failed", error.message);
+}
+
+export async function gemini<T>(parts: Part[]): Promise<{ result: T; model: string; usage: AiUsage }> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new HttpError(500, "AI 키가 아직 설정되지 않았어요.");
 
@@ -139,8 +160,16 @@ export async function gemini<T>(parts: Part[]): Promise<{ result: T; model: stri
       .trim()
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```$/, "");
+    const um = data?.usageMetadata ?? {};
+    const usage: AiUsage = {
+      model,
+      input: um.promptTokenCount ?? null,
+      output: um.candidatesTokenCount ?? null,
+      thinking: um.thoughtsTokenCount ?? null,
+      ms: Date.now() - started,
+    };
     try {
-      return { result: JSON.parse(text) as T, model };
+      return { result: JSON.parse(text) as T, model, usage };
     } catch {
       console.warn(`gemini ${model} returned non-JSON: ${text.slice(0, 200)}`);
       continue;
