@@ -80,7 +80,7 @@ export async function consumeQuota(userClient: SupabaseClient, kind: "lookup" | 
 
 // 무료 등급에서 쓸 수 있는 Flash 모델을 순서대로 시도
 const MODELS = (Deno.env.get("GEMINI_MODELS") ??
-  "gemini-3.5-flash,gemini-3-flash-preview,gemini-2.5-flash,gemini-2.5-flash-lite")
+  "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3-flash-preview")
   .split(",")
   .map((m) => m.trim())
   .filter(Boolean);
